@@ -4,36 +4,40 @@ import matplotlib.pyplot as plt
 
 # -------- activation functions -------
 def relu(z):
-    # TODO
+    return np.maximum(0, z)
 
 def relu_back(xbar, z):
-    # TODO
+    return xbar * (z > 0)  # Changed from return xbar > 0
 
 def tanh(z):
     return np.tanh(z)
 
 def tanh_back(xbar, z):
-    return 1 - np.tanh(z) ** 2
+    return xbar * (1 - np.tanh(z) ** 2)  # Element-wise multiplication with gradient
 
 identity = lambda z: z
 
-identity_back = lambda xbar, z: xbar
+def identity_back(xbar, z):
+    return xbar
 # -------------------------------------------
 
 
 # ---------- initialization -----------
 def initialization(nin, nout):
-   # TODO
+    W = np.random.randn(nin, nout) * np.sqrt(2.0 / nin)
+    b = np.zeros((nout, 1))
     return W, b
 # -------------------------------------
 
 
 # -------- loss functions -----------
 def mse(yhat, y):
-    # TODO
+    assert yhat.shape == y.shape
+    error = yhat - y
+    return np.mean(np.square(error))
 
 def mse_back(yhat, y):
-    # TODO
+    return 2 * (yhat - y) / yhat.size
 # -----------------------------------
 
 
@@ -41,61 +45,91 @@ def mse_back(yhat, y):
 class Layer:
 
     def __init__(self, nin, nout, activation=identity):
-        # TODO: initialize and setup variables
-
+        self.W, self.b = initialization(nin, nout)
+        self.activation = activation
+        if activation == tanh:
+            self.activation_back = tanh_back
         if activation == relu:
             self.activation_back = relu_back
         if activation == identity:
             self.activation_back = identity_back
 
-        # initialize cache
-        # TODO
+        self.cache = {}
 
     def forward(self, X, train=True):
-        # TODO
-
+        Z = self.W.T @ X + self.b
+        Xnext = self.activation(Z)
         # save cache
         if train:
-            # TODO: save cache
+            self.cache['Z'] = Z
+            self.cache['X_in'] = X  # Store input X
+            self.cache['X'] = X  # For backward compatibility
+        return Xnext
 
-        return Xnew
+    def backward(self, XNewBar):
+        Z = self.cache['Z']
+        X_in = self.cache['X_in']  # Get input X
 
-    def backward(self, Xnewbar):
-        # TODO
+        print(f"\nDebug shapes in backward:")
+        print(f"XNewBar shape: {XNewBar.shape}")
+        print(f"Z shape: {Z.shape}")
+        print(f"X_in shape: {X_in.shape}")
+        print(f"W shape: {self.W.shape}")
+
+        Zbar = self.activation_back(XNewBar, Z)
+        print(f"Zbar shape: {Zbar.shape}")
+        
+        # Calculate gradients
+        self.cache['dW'] = X_in @ Zbar.T  # Use input X for weight gradients
+        self.cache['db'] = np.sum(Zbar, axis=1, keepdims=True)
+        
+        # Compute gradient with respect to input
+        Xbar = self.W @ Zbar
+        print(f"Xbar shape: {Xbar.shape}\n")
+        
         return Xbar
 
 
 class Network:
 
     def __init__(self, layers, loss):
-        # TODO: initialization
-
-        if loss == mse:
-            self.loss_back = mse_back
+        self.layers = [*layers]
+        self.loss = loss
+        self.loss_back = mse_back
+        self.cache = {}
 
     def forward(self, X, y, train=True):
 
-        # TODO
+        for layer in self.layers:
+            X = layer.forward(X, train)
+
+        yHat = X
+        L = self.loss(yHat, y)
 
         # save cache
         if train:
-            # TODO
+            self.cache['yHat'] = yHat
+            self.cache['L'] = L
+            self.cache['y'] = y
 
-        return L, yhat
+        return L, yHat
 
     def backward(self):
-
-        # TODO
-
+        lBar = self.loss_back(self.cache['yHat'], self.cache['y'])
+        xBar = lBar
+        for layer in reversed(self.layers):
+            xBar = layer.backward(xBar)
 
 
 class GradientDescent:
 
     def __init__(self, alpha):
-        # TODO
+        self.alpha = alpha
 
     def step(self, network):
-        # TODO
+        for layer in network.layers:
+            layer.W -= self.alpha * layer.cache['dW']
+            layer.b -= self.alpha * layer.cache['db']
 
 
 if __name__ == '__main__':
@@ -160,20 +194,36 @@ if __name__ == '__main__':
 
     # ------------------------------------------------------------
 
-    l1 = Layer(7, ?, relu)
-    # TODO
+    l1 = Layer(7, 32, relu)
+    l2 = Layer(32, 16, relu)
+    l3 = Layer(16, 1)
+
     layers = [l1, l2, l3]
     network = Network(layers, mse)
-    alpha = ?
+    alpha = 0.05
     optimizer = GradientDescent(alpha)
 
+    # In the main training loop:
     train_losses = []
     test_losses = []
-    epochs = ?
-    for i in range(epochs):
-        # TODO: run train set, backprop, step
+    epochs = 1500
 
-        # TODO: run test set
+    for i in range(epochs):
+        # Forward pass and backprop
+        train_loss, y_train_hat = network.forward(Xtrain, ytrain, train=True)
+        network.backward()
+        optimizer.step(network)
+        
+        # Store training loss
+        train_losses.append(train_loss)
+        
+        # Compute and store test loss
+        test_loss, y_test_hat = network.forward(Xtest, ytest, train=False)
+        test_losses.append(test_loss)
+        
+        print(f"Epoch {i+1}/{epochs}: Training Loss = {train_loss:.4f}")
+        print(f"Epoch {i+1}/{epochs}: Testing Loss = {test_loss:.4f}")
+
 
 
     # --- inference ----
